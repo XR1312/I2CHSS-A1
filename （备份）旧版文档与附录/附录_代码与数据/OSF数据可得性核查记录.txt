@@ -1,0 +1,140 @@
+论文数据可得性核查记录（2026-10-11 复核并更正）
+============================================================
+
+核查对象
+  论文 Data availability 声明：
+  "Extensive supplementary material, including all R scripts and publicly available
+   data, supporting tables and figures, the dictionary used for website selection and
+   a software statement can be found in the project's repository on OSF under
+   https://osf.io/atj5u/."
+  核查方式：OSF REST API v2（公开访问，无需登录）。核查日期 2026-10-10，更正日期 2026-10-11。
+
+------------------------------------------------------------
+0. 更正说明（重要）
+------------------------------------------------------------
+2026-10-10 的第一次核查只请求了 osfstorage 这一个存储提供者：
+
+    GET https://api.osf.io/v2/nodes/atj5u/files/osfstorage/        -> HTTP 200，1 个文件
+        supplement.pdf (7,358,001 bytes)
+
+并据此得出"仓库里只有补充材料 PDF、没有数据与 R 脚本"的结论。这个结论是**错的**。
+OSF 节点的文件系统可以挂载多个存储提供者（provider）。osfstorage 只是其中之一，
+该节点还挂了一个 github 存储提供者（OSF 与 GitHub 仓库的双向链接），论文承诺的
+R 脚本与公开数据全部在那里。只看 osfstorage 就会漏掉整个仓库。
+
+正确的做法是先列出提供者，再逐个列举：
+
+    GET https://api.osf.io/v2/nodes/atj5u/files/                   -> 2 个提供者
+        - osfstorage  (kind=folder)
+        - github      (kind=folder)
+
+------------------------------------------------------------
+1. 项目元数据
+------------------------------------------------------------
+GET https://api.osf.io/v2/nodes/atj5u/
+  title         : Mapping the Online Public Sphere with Digital Trace Data
+  public        : true        preprint: true
+  date_created  : 2021-12-10T11:42:07
+  date_modified : 2024-04-18T08:53:52
+  description   : （空）
+  children      : 0（无子组件）
+
+------------------------------------------------------------
+2. 完整文件清单（两个提供者）
+------------------------------------------------------------
+[2.1] provider = osfstorage        GET .../files/osfstorage/
+  supplement.pdf                                   7,358,001 bytes
+
+[2.2] provider = github            GET .../files/github/
+  该提供者下列出的顶层条目：
+  code/  data_public/  README.md  deliberation.Rproj  .gitignore  .Rhistory
+
+  本地下载副本（osf/atj5u/files/github/）的实际大小：
+
+  README.md                                        2080 bytes
+  deliberation.Rproj                                205 bytes
+  code/1_demography_descr.R                         1574 bytes
+  code/1_political_filtering.R                      3068 bytes
+  code/1_tracking_deliberation_preprocessing.R      2863 bytes
+  code/2_application_deliberation_prep.R            8115 bytes
+  code/2_application_deliberation.R                11917 bytes
+  code/2_measurement_deliberation_LCA.R            20997 bytes   <-- 复现目标脚本
+  code/2_measurement_deliberation_prep.R            7544 bytes
+  code/2_measurement_description.R                  4762 bytes
+  code/scrape_forums.R                               529 bytes
+  code/tracking_packages.R                          1272 bytes
+  data_public/data_code_final_4_V3.xlsx            21409 bytes   (208 行：69 个政治域名 + 139 个 drop)
+  data_public/data_LCA_c_V3.xlsx                   13968 bytes   <-- LCA 的输入矩阵
+  data_public/dictionaries.xlsx                    10908 bytes
+  data_public/forums.xlsx                          20708 bytes
+  data_public/keywords_politics_clean_f.xlsx       12557 bytes   (247 个政治关键词)
+  data_public/top_1000_cat_man.xlsx                38462 bytes   (前 1000 域名的人工分类)
+
+  完整性校验（sha256）：
+    data_public/data_LCA_c_V3.xlsx
+      fe64b3ccea65c43fd618783b124f13b1bef0dc47dc1720cd6c353714065dba10
+    code/2_measurement_deliberation_LCA.R
+      94535c88082fcc627b4d2f12c7e62801de5f1196e2e6d185c588d26c70d24e63
+
+------------------------------------------------------------
+3. 关键事实核对
+------------------------------------------------------------
+(a) 输入矩阵确实公开
+    data_public/data_LCA_c_V3.xlsx = 69 个域名 × 23 列：
+       domain, clicks, 15 条二值标准, X1/X2/X3（作者算好的后验概率）, class
+    15 条标准就是脚本 cbind() 里的那 15 条：
+       info_pol, info_loc, info_qual, com_pr, com_rec,
+       par_par, par_actor, par_orga, isolation_in, isolation_out,
+       incl_gender, incl_age, incl_educ, hom_pol_or, hom_vote1
+    （公开编码手册里的 com_mod 与 hom_vote2 没有进入 LCA，与脚本一致。）
+
+(b) 与论文基准表逐项吻合
+    · clicks 合计 = 493,714，与正文 Results 的 "less than 1% (493,714 clicks)" 相同；
+      且 69 个域名的点击量与 SI 表 C1 逐站一致（69/69）。
+    · class 列的规模 15 / 20 / 34，混合比例 21.7% / 29.0% / 49.3%，
+      与正文报告的 22% / 29% / 49% 一致；与表 C1 的列对应关系是
+      表 C1 的 C1 → class 3（34 个）、C2 → class 1（15 个）、C3 → class 2（20 个）。
+    · 由此可以确认：正文 Results 里 "34 … 20 … and 25 websites"（合计 79）是把 15 写成了 25
+      的笔误（公开数据与表 C1 都是 34/20/15）。这一点现在是**证据**，不再是推测。
+
+(c) 数据可得性的实际边界
+    公开：网站层的 69×15 二值矩阵、类别归属、后验概率、词典、前 1000 域名的人工分类。
+    未公开：个体级的原始追踪数据（pulse_weburls_jul2017_dec_2017_df.RData，约 1.16 GB）
+            与问卷数据（ger_survey_2017_long.RData）。
+    因此 1_tracking_deliberation_preprocessing.R、1_political_filtering.R、
+    2_measurement_deliberation_prep.R（连通性/包容性/异质性的构造）以及整个应用层
+    无法从零重建；而 LCA 及其全部稳健性检验可以完整重跑。
+
+------------------------------------------------------------
+4. 复现结论
+------------------------------------------------------------
+用公开数据 + 自实现 poLCA 等价 EM，逐格复核了 SI 表 C2（K=1–10）：
+  · K=1–4 的 logLik / Df / BIC / aBIC / CAIC / Gsq 与论文四舍五入到整数后完全相同；
+  · K=3 的 207 个后验概率与数据文件里作者已存的 X1/X2/X3 最大绝对偏差 0.0001，
+    类别归属 69/69 一致；
+  · 两类解 34/35 与 SI 表 C3 的 C1/C2 完全一致（34/34 与 35/35）。
+同时发现四处需要说明的地方（详见 repro_report.txt）：
+  (1) SI 表 C2 中名为 "AIC" 的那一列其实是 CAIC——脚本写作 AIC = CAICs；
+  (2) 脚本自身的选择规则（min BIC）会选出 2 类解，论文正文报告的是 3 类解；
+  (3) K≥5 各行的对数似然是起点依赖的局部极大值（把随机起点加到 400 个仍能改善）；
+  (4) incl_gender / incl_age / incl_educ 三列在公开矩阵中取值完全相同，
+      15 条标准实际只有 13 种互异的取值模式，而 npar 仍按 15 条计算。
+
+------------------------------------------------------------
+5. 如何复核本记录
+------------------------------------------------------------
+1) 列出提供者：   curl -s https://api.osf.io/v2/nodes/atj5u/files/
+2) 列 github 目录：curl -s https://api.osf.io/v2/nodes/atj5u/files/github/
+3) 也可直接在浏览器打开 https://osf.io/atj5u/ ，左侧"Files"里能看到 github 提供的
+   code/ 与 data_public/ 两个文件夹。
+4) 重跑本作业的复现报告：python3 repro_lca.py（见 repro_report.txt 的表头说明）。
+   本作业已把公开的 code/ 与 data_public/ 连同 README 一起复制到
+   附录_代码与数据/osf公开代码与数据/，可离线复核。
+
+------------------------------------------------------------
+6. 备注
+------------------------------------------------------------
+补充材料（6_补充材料（Supplementary Information）.pdf）仍是比对基准的来源：
+表 C1（69 域名、类别归属、点击量）、表 C2（1–10 类模型的拟合指标）、
+表 C3–C11（各类备择模型的类别归属与拟合指标）、图 C5（标准间相关矩阵）、
+附录 D（政治关键词词典的 Inclusion 与 Exclusion 词表）。
